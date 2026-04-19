@@ -73,8 +73,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .tab-btn:hover{background:rgba(255,255,255,.25);}
 .tab-btn.active{background:#fff;color:#c1121f;border-color:#fff;}
 .view{display:none;height:calc(100vh - 56px);}
-.view.active{display:flex;}
-#viewCis{flex-direction:column;padding:20px;overflow-y:auto;}
+.view.active{display:block;}
+#viewCis.active{display:flex;flex-direction:column;padding:20px;overflow-y:auto;}
 
 /* Scrollbar */
 #sidebar::-webkit-scrollbar{width:6px;}
@@ -263,13 +263,20 @@ function computeInitialTargets() {
     var sectorActual = 0;
     sec.cis.forEach(function(cn){ sectorActual += (cisIspCount[norm(cn)] || 0); });
     var deficit = Math.max(0, Math.ceil(needed) - Math.ceil(sectorActual));
-    var nbCis = sec.cis.length || 1;
-    var base = Math.floor(deficit / nbCis);
-    var remainder = deficit - base * nbCis;
-    sec.cis.forEach(function(cn, i) {
-      var actual = cisIspCount[norm(cn)] || 0;
-      cisTargets[norm(cn)] = Math.ceil(actual) + base + (i < remainder ? 1 : 0);
-    });
+    if (deficit === 0) {
+      // Enough ISP already — target = actual rounded up, no recruitment
+      sec.cis.forEach(function(cn) {
+        cisTargets[norm(cn)] = Math.ceil(cisIspCount[norm(cn)] || 0);
+      });
+    } else {
+      var nbCis = sec.cis.length || 1;
+      var base = Math.floor(deficit / nbCis);
+      var remainder = deficit - base * nbCis;
+      sec.cis.forEach(function(cn, i) {
+        var actual = cisIspCount[norm(cn)] || 0;
+        cisTargets[norm(cn)] = Math.ceil(actual) + base + (i < remainder ? 1 : 0);
+      });
+    }
   });
 }
 
@@ -474,8 +481,8 @@ function renderCisTab() {
     });
     var recruit = Math.max(0, neededCeil - Math.ceil(sectorActual));
 
-    // Per-sector rebalance check: sum of targets should equal neededCeil (or sectorActual if no deficit)
-    var expectedTargetSum = Math.max(neededCeil, Math.ceil(sectorActual));
+    // Per-sector rebalance check
+    var expectedTargetSum = recruit > 0 ? neededCeil : Math.ceil(sectorActual);
     var delta = sectorTarget - expectedTargetSum;
     var hasRebalance = delta !== 0;
 
