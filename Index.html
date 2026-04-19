@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--bg:#f0f2f5;--card:#fff;--primary:#e63946;--primary-light:#fde8ea;--blue:#457b9d;--green:#2a9d8f;--orange:#e76f51;--text:#1d3557;--text-light:#6b7280;--border:#e5e7eb;--radius:12px;--shadow:0 2px 12px rgba(0,0,0,.06);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;overflow:hidden;height:100vh;}
+
+.topbar{background:linear-gradient(135deg,var(--primary) 0%,#c1121f 100%);color:#fff;padding:14px 24px;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:space-between;}
+.topbar h1{font-size:1.2em;font-weight:800;letter-spacing:-.3px;}
+.topbar-sub{font-size:.8em;opacity:.85;}
+
+.main-layout{display:flex;height:calc(100vh - 56px);}
+#map{flex:1;z-index:1;}
+#sidebar{width:420px;overflow-y:auto;background:var(--card);padding:16px;box-shadow:-4px 0 20px rgba(0,0,0,.1);z-index:2;display:flex;flex-direction:column;gap:12px;}
+
+.section-title{font-size:.95em;font-weight:800;color:var(--primary);border-bottom:2px solid var(--primary);padding-bottom:6px;margin-bottom:8px;}
+
+/* Global sliders */
+.global-controls{background:var(--bg);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.ctrl-row{display:flex;align-items:center;gap:8px;}
+.ctrl-row label{font-size:.8em;font-weight:600;min-width:100px;}
+.ctrl-row input[type=range]{flex:1;accent-color:var(--primary);}
+.ctrl-row .val{font-size:.85em;font-weight:700;min-width:50px;text-align:right;}
+
+/* Zone type controls */
+.zone-type-row{display:flex;align-items:center;gap:8px;padding:4px 0;}
+.zone-type-row label{font-size:.78em;font-weight:600;min-width:60px;}
+.zone-type-row input[type=range]{flex:1;accent-color:var(--blue);}
+.zone-type-row .val{font-size:.82em;font-weight:700;min-width:40px;text-align:right;}
+
+/* Sector cards */
+.sector-card{background:var(--bg);border-radius:8px;padding:10px 12px;border-left:4px solid transparent;transition:all .2s;cursor:pointer;}
+.sector-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1);transform:translateX(2px);}
+.sector-card.active{background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.12);}
+.sector-name{font-weight:700;font-size:.88em;display:flex;justify-content:space-between;align-items:center;}
+.sector-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:6px;font-size:.78em;}
+.sector-stats .st{text-align:center;padding:3px 4px;border-radius:4px;background:rgba(0,0,0,.04);}
+.sector-stats .st b{display:block;font-size:1.1em;}
+.sector-stats .st.ok b{color:var(--green);}
+.sector-stats .st.warn b{color:var(--orange);}
+.sector-stats .st.crit b{color:var(--primary);}
+.sector-type-select{font-size:.75em;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--card);cursor:pointer;}
+.sector-slider-row{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:.75em;}
+.sector-slider-row input[type=range]{flex:1;accent-color:var(--orange);}
+
+/* CIS list */
+.cis-zone-group{margin-bottom:8px;}
+.cis-zone-header{font-size:.82em;font-weight:700;padding:4px 8px;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
+.cis-row{display:flex;align-items:center;gap:6px;padding:3px 8px;font-size:.78em;border-bottom:1px solid var(--border);}
+.cis-row .cis-name{flex:1;}
+.cis-row .cis-isp{font-weight:700;min-width:30px;text-align:center;}
+.cis-row .cis-recruit{font-weight:700;min-width:30px;text-align:center;color:var(--primary);}
+.cis-row select{font-size:.75em;padding:1px 4px;border:1px solid var(--border);border-radius:3px;max-width:100px;}
+.arrow-btn{width:20px;height:20px;border:1px solid var(--border);border-radius:3px;background:var(--card);cursor:pointer;font-size:.7em;display:flex;align-items:center;justify-content:center;font-weight:700;}
+.arrow-btn:hover{background:var(--primary-light);border-color:var(--primary);}
+
+/* Summary */
+.summary-box{background:var(--bg);border-radius:8px;padding:12px;border:2px solid var(--primary);}
+.summary-row{display:flex;justify-content:space-between;padding:2px 0;font-size:.85em;}
+.summary-row b{color:var(--primary);}
+
+/* Rebalance warning */
+.rebalance-msg{background:#fff3cd;color:#856404;padding:8px 12px;border-radius:6px;font-size:.8em;font-weight:600;text-align:center;display:none;}
+
+/* Tabs */
+.tab-bar{display:flex;gap:6px;}
+.tab-btn{background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.3);color:#fff;padding:6px 16px;border-radius:8px;cursor:pointer;font-weight:700;font-size:.82em;transition:all .2s;font-family:inherit;}
+.tab-btn:hover{background:rgba(255,255,255,.25);}
+.tab-btn.active{background:#fff;color:#c1121f;border-color:#fff;}
+.view{display:none;height:calc(100vh - 56px);}
+.view.active{display:flex;}
+#viewCis{flex-direction:column;padding:20px;overflow-y:auto;}
+
+/* Scrollbar */
+#sidebar::-webkit-scrollbar{width:6px;}
+#sidebar::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px;}
+
+@media(max-width:900px){.main-layout{flex-direction:column;}#sidebar{width:100%;max-height:45vh;}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <h1>🗺️ Patatoïde V2 — Dimensionnement ISP</h1>
+    <div class="topbar-sub">SDIS 66 — Planification couverture opérationnelle</div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('carte')">🗺️ Carte</button>
+    <button class="tab-btn" onclick="showTab('cis')">🏢 CIS / Recrutement</button>
+  </div>
+</div>
+
+<!-- VUE CARTE -->
+<div id="viewCarte" class="view active">
+  <div class="main-layout">
+    <div id="map"></div>
+    <div id="sidebar">
+      <div id="loadingBox" style="text-align:center;padding:40px;color:gray;">Chargement des données...</div>
+      <div id="sidebarContent" style="display:none;">
+        
+        <!-- Résumé global -->
+        <div class="summary-box" id="summaryBox">
+          <div style="font-weight:800;font-size:.92em;margin-bottom:6px;">📊 Résumé global</div>
+          <div class="summary-row"><span>ISP actuels</span><b id="sumActuels">0</b></div>
+          <div class="summary-row"><span>ISP nécessaires</span><b id="sumNecessaires">0</b></div>
+          <div class="summary-row"><span>Recrutements</span><b id="sumRecrut">0</b></div>
+        </div>
+        
+        <div class="rebalance-msg" id="rebalanceMsg">⚠️ Vous devez replacer <b id="rebalanceDelta">0</b> ISP</div>
+
+        <!-- Contrôles globaux -->
+        <div class="global-controls">
+          <div style="font-weight:700;font-size:.85em;">⚙️ Paramètres globaux</div>
+          <div class="ctrl-row">
+            <label>Heures/ISP/mois</label>
+            <input type="range" id="sliderHeures" min="12" max="72" value="36" step="1" oninput="updateAll()">
+            <span class="val" id="valHeures">36h</span>
+          </div>
+          <div style="font-size:.78em;font-weight:600;margin-top:4px;">Taux couverture par type de zone :</div>
+          <div class="zone-type-row">
+            <label style="color:var(--primary);">Zone 1</label>
+            <input type="range" id="sliderZ1" min="10" max="100" value="80" step="5" oninput="updateAll()">
+            <span class="val" id="valZ1">80%</span>
+          </div>
+          <div class="zone-type-row">
+            <label style="color:var(--orange);">Zone 2</label>
+            <input type="range" id="sliderZ2" min="10" max="100" value="60" step="5" oninput="updateAll()">
+            <span class="val" id="valZ2">60%</span>
+          </div>
+          <div class="zone-type-row">
+            <label style="color:var(--blue);">Zone 3</label>
+            <input type="range" id="sliderZ3" min="10" max="100" value="40" step="5" oninput="updateAll()">
+            <span class="val" id="valZ3">40%</span>
+          </div>
+        </div>
+        
+        <!-- Secteurs -->
+        <div class="section-title">Secteurs</div>
+        <div id="sectorsContainer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VUE CIS -->
+<div id="viewCis" class="view">
+  <div style="max-width:900px;margin:0 auto;width:100%;">
+    <div class="summary-box" id="summaryBox2" style="margin-bottom:16px;">
+      <div style="font-weight:800;font-size:.92em;margin-bottom:6px;">📊 Résumé global</div>
+      <div class="summary-row"><span>ISP actuels</span><b id="sumActuels2">0</b></div>
+      <div class="summary-row"><span>ISP nécessaires</span><b id="sumNecessaires2">0</b></div>
+      <div class="summary-row"><span>Recrutements nécessaires</span><b id="sumRecrut2">0</b></div>
+    </div>
+    <div class="rebalance-msg" id="rebalanceMsg2" style="margin-bottom:12px;">⚠️ Vous devez replacer <b id="rebalanceDelta2">0</b> ISP</div>
+    <div class="section-title">CIS par secteur — Répartition des recrutements</div>
+    <div id="cisContainer"></div>
+  </div>
+</div>
+
+<script>
+/* ═══ CIS avec coordonnées GPS ═══ */
+var CIS_GEO = {
+  'agly':{lat:42.7957,lng:2.6878},'baixas':{lat:42.7546,lng:2.8103},'canet':{lat:42.7066,lng:3.0130},
+  'caudies':{lat:42.8099,lng:2.3742},'le barcares':{lat:42.7910,lng:3.0340},'maury':{lat:42.8329,lng:2.5878},
+  'millas':{lat:42.6944,lng:2.6950},'perpignan nord':{lat:42.7200,lng:2.8950},
+  'perpignan ouest':{lat:42.6980,lng:2.8400},'perpignan sud':{lat:42.6770,lng:2.8950},
+  'rivesaltes':{lat:42.7702,lng:2.8770},'salanque':{lat:42.7714,lng:2.9936},
+  'salses':{lat:42.8367,lng:2.9208},'saint paul de fenouillet':{lat:42.8109,lng:2.5030},
+  'vingrau':{lat:42.8591,lng:2.7382},'capcir':{lat:42.5718,lng:2.0695},
+  'porte cerdagne':{lat:42.4323,lng:1.9485},'font romeu':{lat:42.5044,lng:2.0370},
+  'ille sur tet':{lat:42.6710,lng:2.6210},'mont louis':{lat:42.5106,lng:2.1213},
+  'olette':{lat:42.5430,lng:2.2750},'prades':{lat:42.6177,lng:2.4216},
+  'saillagouse':{lat:42.4590,lng:2.0370},'sournia':{lat:42.7316,lng:2.4317},
+  'vernet':{lat:42.5458,lng:2.3870},'vinca':{lat:42.6438,lng:2.5277},
+  'les aspres':{lat:42.6336,lng:2.7553},'riberal':{lat:42.6980,lng:2.7650},
+  'saint cyprien':{lat:42.6193,lng:3.0067},'elne':{lat:42.5991,lng:2.9718},
+  'palau':{lat:42.5711,lng:2.9609},'argeles':{lat:42.5460,lng:3.0233},
+  'boulou':{lat:42.5230,lng:2.8334},'ceret':{lat:42.4860,lng:2.7480},
+  'vallespir':{lat:42.4581,lng:2.6313},'saint laurent de cerdans':{lat:42.3853,lng:2.6101},
+  'prats de mollo':{lat:42.4053,lng:2.4855},'cote vermeille':{lat:42.5170,lng:3.1040},
+  'banyuls':{lat:42.4830,lng:3.1290},'cerbere':{lat:42.4424,lng:3.1685},
+  'thuir':{lat:42.6310,lng:2.7590},'riveral':{lat:42.6980,lng:2.7650}
+};
+
+/* ═══ SECTEURS ═══ */
+var SECTORS = [
+  { name:'Agglo', cis:['perpignan ouest','perpignan nord','perpignan sud'], type:1, color:'#e63946', hPerIsp:36 },
+  { name:'Albères', cis:['saint cyprien','elne','palau','argeles'], type:2, color:'#00b894', hPerIsp:36 },
+  { name:'Albères Côtier', cis:['cote vermeille','banyuls','cerbere'], type:3, color:'#fd79a8', hPerIsp:36 },
+  { name:'Nord Côtier', cis:['le barcares','salanque','canet'], type:2, color:'#6c5ce7', hPerIsp:36 },
+  { name:'Nord', cis:['agly','vingrau','baixas','rivesaltes','salses'], type:2, color:'#e76f51', hPerIsp:36 },
+  { name:'Centre', cis:['ille sur tet','millas','riberal','thuir'], type:2, color:'#2a9d8f', hPerIsp:36 },
+  { name:'Vallespir 1', cis:['ceret','boulou'], type:2, color:'#fdcb6e', hPerIsp:36 },
+  { name:'Vallespir 2', cis:['prats de mollo','vallespir','saint laurent de cerdans'], type:3, color:'#fab1a0', hPerIsp:36 },
+  { name:'Fenouillèdes', cis:['caudies','saint paul de fenouillet','maury','sournia'], type:3, color:'#636e72', hPerIsp:36 },
+  { name:'Conflent', cis:['olette','vernet','prades','vinca'], type:2, color:'#0984e3', hPerIsp:36 },
+  { name:'Montagne 1', cis:['capcir','font romeu','mont louis'], type:3, color:'#d63031', hPerIsp:36 },
+  { name:'Montagne 2', cis:['porte cerdagne','saillagouse'], type:3, color:'#a29bfe', hPerIsp:36 }
+];
+
+/* ═══ DONNÉES LIVE ═══ */
+var DATA = null;        // from server
+var cisIspCount = {};   // cisName (lower) → float ISP count
+var cisAdjustments = {}; // cisName → manual +/- from arrows
+var originalRecruitBySector = {}; // baseline per sector
+
+/* ═══ TABS ═══ */
+function showTab(t) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (t === 'carte') { document.getElementById('viewCarte').classList.add('active'); document.querySelectorAll('.tab-btn')[0].classList.add('active'); }
+  else { document.getElementById('viewCis').classList.add('active'); document.querySelectorAll('.tab-btn')[1].classList.add('active'); }
+}
+
+/* ═══ INIT ═══ */
+google.script.run.withSuccessHandler(function(data) {
+  DATA = data;
+  computeIspCounts();
+  document.getElementById('loadingBox').style.display = 'none';
+  document.getElementById('sidebarContent').style.display = '';
+  initMap();
+  updateAll();
+}).getData();
+
+function norm(s) { return (s||'').toString().trim().toLowerCase().replace(/\s+/g,' '); }
+
+function computeIspCounts() {
+  cisIspCount = {};
+  // Init all CIS to 0
+  for (var i = 0; i < DATA.cis.length; i++) {
+    cisIspCount[norm(DATA.cis[i].nom)] = 0;
+  }
+  // Count ISP
+  for (var i = 0; i < DATA.isp.length; i++) {
+    var isp = DATA.isp[i];
+    var cp = norm(isp.centrePrincipal);
+    var cs = norm(isp.centreSecondaire);
+    if (cp && cs) {
+      // Partage 50/50
+      cisIspCount[cp] = (cisIspCount[cp] || 0) + 0.5;
+      cisIspCount[cs] = (cisIspCount[cs] || 0) + 0.5;
+    } else if (cp) {
+      cisIspCount[cp] = (cisIspCount[cp] || 0) + 1;
+    }
+  }
+}
+
+function getEffectiveIsp(cisName) {
+  var base = cisIspCount[norm(cisName)] || 0;
+  var adj = cisAdjustments[norm(cisName)] || 0;
+  return base + adj;
+}
+
+/* ═══ CALCUL COUVERTURE ═══ */
+// 100% = 1 ISP 24h/24 tous les jours = 24h × 30.4j = 730h/mois
+// Si chaque ISP fait hPerIsp heures/mois, il faut (730 × covPct) / hPerIsp ISP
+function calcNeededIsp(covPct, hPerIsp) {
+  var totalHNeeded = 730 * (covPct / 100); // heures de couverture par mois
+  return totalHNeeded / hPerIsp;
+}
+
+function getCovPct(sectorType) {
+  if (sectorType === 1) return parseInt(document.getElementById('sliderZ1').value);
+  if (sectorType === 2) return parseInt(document.getElementById('sliderZ2').value);
+  return parseInt(document.getElementById('sliderZ3').value);
+}
+
+/* ═══ MAP ═══ */
+var mapObj, zonePolys = [], zoneLabels = [];
+
+function initMap() {
+  mapObj = L.map('map').setView([42.55, 2.55], 10);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© CARTO © OSM', maxZoom: 18
+  }).addTo(mapObj);
+  
+  mapObj.createPane('cisMarkers');
+  mapObj.getPane('cisMarkers').style.zIndex = 650;
+  
+  // Légende
+  var leg = L.control({position:'bottomleft'});
+  leg.onAdd = function() {
+    var d = L.DomUtil.create('div','');
+    d.style.cssText = 'background:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.2);font-size:11px;line-height:1.8;';
+    d.innerHTML = '<strong>Légende</strong><br>' +
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--primary);"></span> Zone 1 ('+document.getElementById('sliderZ1').value+'%)<br>' +
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--orange);"></span> Zone 2 ('+document.getElementById('sliderZ2').value+'%)<br>' +
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue);"></span> Zone 3 ('+document.getElementById('sliderZ3').value+'%)';
+    return d;
+  };
+  leg.addTo(mapObj);
+}
+
+function drawMap() {
+  if (!mapObj) return;
+  // Clear
+  zonePolys.forEach(l => mapObj.removeLayer(l));
+  zoneLabels.forEach(l => mapObj.removeLayer(l));
+  zonePolys = []; zoneLabels = [];
+  
+  // Remove old CIS markers
+  if (window._cisMarkers) window._cisMarkers.forEach(m => mapObj.removeLayer(m));
+  window._cisMarkers = [];
+  
+  var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
+  
+  SECTORS.forEach(function(sec) {
+    // Collect CIS coords for polygon
+    var coords = [];
+    sec.cis.forEach(function(cn) {
+      var g = CIS_GEO[norm(cn)];
+      if (g) coords.push([g.lat, g.lng]);
+    });
+    if (coords.length === 0) return;
+    
+    // Calc sector stats
+    var covPct = getCovPct(sec.type);
+    var totalIsp = 0;
+    sec.cis.forEach(cn => { totalIsp += getEffectiveIsp(cn); });
+    var needed = calcNeededIsp(covPct, hPerIsp);
+    var recruit = Math.max(0, Math.ceil(needed - totalIsp));
+    var currentCov = needed > 0 ? Math.min(100, Math.round(totalIsp / needed * 100)) : 100;
+    
+    // Color based on status
+    var fillColor = sec.color;
+    var fillOpacity = currentCov >= 100 ? 0.15 : (currentCov >= 70 ? 0.25 : 0.35);
+    
+    // Create polygon (convex hull around CIS)
+    var poly;
+    if (coords.length === 1) {
+      // Circle for single point
+      poly = L.circle(coords[0], { radius: 8000, color: sec.color, weight: 2, fillColor: fillColor, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
+    } else if (coords.length === 2) {
+      // Buffer the line
+      var buffered = bufferLine(coords[0], coords[1], 0.06);
+      poly = L.polygon(buffered, { color: sec.color, weight: 2, fillColor: fillColor, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
+    } else {
+      var hull = convexHull(coords);
+      var expanded = expandPoly(hull, 0.04);
+      poly = L.polygon(expanded, { color: sec.color, weight: 2, fillColor: fillColor, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
+    }
+    poly._sectorName = sec.name;
+    poly.on('click', function() { hlSector(sec.name); });
+    zonePolys.push(poly);
+    
+    // Label at centroid
+    var ct = centroid(coords);
+    var statusIcon = currentCov >= 100 ? '✅' : (currentCov >= 70 ? '⚠️' : '🔴');
+    var labelHtml = '<div style="background:'+sec.color+';color:#fff;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.3);text-align:center;pointer-events:none;">'+
+      sec.name+'<br>'+statusIcon+' '+Math.round(totalIsp)+'/'+Math.ceil(needed)+' ISP'+
+      (recruit > 0 ? '<br><span style="background:#fff;color:'+sec.color+';padding:1px 5px;border-radius:3px;font-size:9px;">+'+recruit+' à recruter</span>' : '')+
+      '</div>';
+    var lbl = L.marker(ct, { icon: L.divIcon({ className:'', html: labelHtml, iconSize: null, iconAnchor:[50,20] }) }).addTo(mapObj);
+    zoneLabels.push(lbl);
+    
+    // CIS markers
+    sec.cis.forEach(function(cn) {
+      var g = CIS_GEO[norm(cn)];
+      if (!g) return;
+      var ispCount = getEffectiveIsp(cn);
+      var tip = '<strong>' + cn + '</strong><br>Secteur: ' + sec.name + '<br>ISP: <strong>' + ispCount.toFixed(1) + '</strong>';
+      var m = L.circleMarker([g.lat, g.lng], { pane:'cisMarkers', radius: Math.max(4, Math.min(12, ispCount * 1.5 + 3)), fillColor: sec.color, color:'#fff', weight:2, fillOpacity:.9 })
+        .addTo(mapObj).bindTooltip(tip, {direction:'top', offset:[0,-8]});
+      window._cisMarkers.push(m);
+    });
+  });
+}
+
+/* ═══ GEOMETRY HELPERS ═══ */
+function centroid(pts) {
+  var lat = 0, lng = 0;
+  pts.forEach(p => { lat += p[0]; lng += p[1]; });
+  return [lat / pts.length, lng / pts.length];
+}
+
+function convexHull(points) {
+  var pts = points.slice().sort((a,b) => a[1]-b[1] || a[0]-b[0]);
+  if (pts.length <= 2) return pts;
+  var cross = (O,A,B) => (A[0]-O[0])*(B[1]-O[1]) - (A[1]-O[1])*(B[0]-O[0]);
+  var lower = [];
+  for (var i = 0; i < pts.length; i++) { while (lower.length >= 2 && cross(lower[lower.length-2],lower[lower.length-1],pts[i]) <= 0) lower.pop(); lower.push(pts[i]); }
+  var upper = [];
+  for (var i = pts.length-1; i >= 0; i--) { while (upper.length >= 2 && cross(upper[upper.length-2],upper[upper.length-1],pts[i]) <= 0) upper.pop(); upper.push(pts[i]); }
+  upper.pop(); lower.pop();
+  return lower.concat(upper);
+}
+
+function expandPoly(pts, d) {
+  var ct = centroid(pts);
+  return pts.map(p => [ct[0] + (p[0]-ct[0])*(1+d/Math.max(0.001,Math.sqrt((p[0]-ct[0])**2+(p[1]-ct[1])**2))*0.5), ct[1] + (p[1]-ct[1])*(1+d/Math.max(0.001,Math.sqrt((p[0]-ct[0])**2+(p[1]-ct[1])**2))*0.5)]);
+}
+
+function bufferLine(a, b, d) {
+  var dx = b[1]-a[1], dy = b[0]-a[0], len = Math.sqrt(dx*dx+dy*dy) || 1;
+  var nx = -dy/len*d, ny = dx/len*d;
+  return [[a[0]+nx,a[1]+ny],[b[0]+nx,b[1]+ny],[b[0]-nx,b[1]-ny],[a[0]-nx,a[1]-ny]];
+}
+
+/* ═══ HIGHLIGHT SECTOR ═══ */
+function hlSector(name) {
+  document.querySelectorAll('.sector-card').forEach(c => c.classList.toggle('active', c.getAttribute('data-s') === name));
+  zonePolys.forEach(p => {
+    if (p._sectorName === name) { if (p.getBounds) mapObj.fitBounds(p.getBounds().pad(.3)); p.setStyle({fillOpacity:.35,weight:3}); }
+    else { p.setStyle({fillOpacity:.15,weight:2}); }
+  });
+}
+
+/* ═══ UPDATE ALL ═══ */
+function updateAll() {
+  var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
+  document.getElementById('valHeures').textContent = hPerIsp + 'h';
+  document.getElementById('valZ1').textContent = document.getElementById('sliderZ1').value + '%';
+  document.getElementById('valZ2').textContent = document.getElementById('sliderZ2').value + '%';
+  document.getElementById('valZ3').textContent = document.getElementById('sliderZ3').value + '%';
+  
+  var totalActuels = 0, totalNeeded = 0, totalRecruit = 0;
+  var sectorHtml = '';
+  
+  SECTORS.forEach(function(sec, idx) {
+    var covPct = getCovPct(sec.type);
+    var sectorIsp = 0;
+    sec.cis.forEach(cn => { sectorIsp += getEffectiveIsp(cn); });
+    var needed = calcNeededIsp(covPct, hPerIsp);
+    var recruit = Math.max(0, Math.ceil(needed - sectorIsp));
+    var currentCov = needed > 0 ? Math.min(100, Math.round(sectorIsp / needed * 100)) : 100;
+    
+    totalActuels += sectorIsp;
+    totalNeeded += needed;
+    totalRecruit += recruit;
+    
+    var statusCls = currentCov >= 100 ? 'ok' : (currentCov >= 70 ? 'warn' : 'crit');
+    var typeLabel = 'Zone ' + sec.type;
+    
+    sectorHtml += '<div class="sector-card" data-s="' + sec.name + '" style="border-left-color:' + sec.color + ';" onclick="hlSector(\'' + sec.name + '\')">' +
+      '<div class="sector-name"><span style="color:'+sec.color+';">■</span> ' + sec.name + 
+      ' <select class="sector-type-select" onchange="changeSectorType('+idx+',this.value)" onclick="event.stopPropagation()">' +
+      '<option value="1"'+(sec.type===1?' selected':'')+'>Zone 1</option>' +
+      '<option value="2"'+(sec.type===2?' selected':'')+'>Zone 2</option>' +
+      '<option value="3"'+(sec.type===3?' selected':'')+'>Zone 3</option></select></div>' +
+      '<div class="sector-stats">' +
+      '<div class="st '+statusCls+'"><b>' + sectorIsp.toFixed(1) + '</b>actuels</div>' +
+      '<div class="st"><b>' + Math.ceil(needed) + '</b>nécessaires</div>' +
+      '<div class="st '+(recruit>0?'crit':'ok')+'"><b>' + (recruit > 0 ? '+'+recruit : '✓') + '</b>recrutement</div>' +
+      '</div>' +
+      '<div class="sector-slider-row" onclick="event.stopPropagation()"><span>⏱ h/ISP:</span>' +
+      '<input type="range" min="12" max="72" value="'+sec.hPerIsp+'" step="1" oninput="changeSectorH('+idx+',this.value)">' +
+      '<span style="font-weight:700;min-width:35px;">'+sec.hPerIsp+'h</span></div>' +
+      '</div>';
+  });
+  
+  document.getElementById('sectorsContainer').innerHTML = sectorHtml;
+  
+  // Summary
+  ['','2'].forEach(function(s) {
+    var el = document.getElementById('sumActuels'+s);
+    if (el) el.textContent = Math.round(totalActuels);
+    el = document.getElementById('sumNecessaires'+s);
+    if (el) el.textContent = Math.ceil(totalNeeded);
+    el = document.getElementById('sumRecrut'+s);
+    if (el) el.textContent = totalRecruit > 0 ? '+' + totalRecruit : '0';
+  });
+  
+  // Check rebalance
+  var totalAdj = 0;
+  for (var k in cisAdjustments) totalAdj += cisAdjustments[k];
+  ['','2'].forEach(function(s) {
+    var msg = document.getElementById('rebalanceMsg'+s);
+    if (totalAdj !== 0) {
+      msg.style.display = 'block';
+      document.getElementById('rebalanceDelta'+s).textContent = (totalAdj > 0 ? '+' : '') + totalAdj;
+    } else {
+      msg.style.display = 'none';
+    }
+  });
+  
+  drawMap();
+  renderCisTab();
+}
+
+function changeSectorType(idx, val) {
+  SECTORS[idx].type = parseInt(val);
+  updateAll();
+}
+
+function changeSectorH(idx, val) {
+  SECTORS[idx].hPerIsp = parseInt(val);
+  updateAll();
+}
+
+/* ═══ CIS TAB ═══ */
+function renderCisTab() {
+  var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
+  var html = '';
+  
+  SECTORS.forEach(function(sec) {
+    var covPct = getCovPct(sec.type);
+    var sectorIsp = 0;
+    sec.cis.forEach(cn => { sectorIsp += getEffectiveIsp(cn); });
+    var needed = calcNeededIsp(covPct, hPerIsp);
+    var recruit = Math.max(0, Math.ceil(needed - sectorIsp));
+    
+    // Distribute recruitment proportionally across CIS
+    var cisData = sec.cis.map(function(cn) {
+      return { name: cn, isp: getEffectiveIsp(cn), baseIsp: cisIspCount[norm(cn)] || 0 };
+    });
+    var totalCisIsp = cisData.reduce((s,c) => s + c.isp, 0) || 1;
+    
+    html += '<div class="cis-zone-group">';
+    html += '<div class="cis-zone-header" style="background:'+sec.color+'22;border-left:4px solid '+sec.color+';">' +
+      '<span style="color:'+sec.color+';"><b>'+sec.name+'</b> (Zone '+sec.type+')</span>' +
+      '<span>'+sectorIsp.toFixed(1)+'/'+Math.ceil(needed)+' ISP — '+(recruit>0?'<b style="color:var(--primary);">+'+recruit+' recrut.</b>':'<b style="color:var(--green);">✓ OK</b>')+'</span></div>';
+    
+    cisData.forEach(function(c) {
+      var cisRecruit = recruit > 0 ? Math.round(recruit * (c.isp / totalCisIsp) || (1/cisData.length)) : 0;
+      var adj = cisAdjustments[norm(c.name)] || 0;
+      
+      html += '<div class="cis-row">' +
+        '<span class="cis-name">' + c.name + '</span>' +
+        '<span style="font-size:.72em;color:var(--text-light);">ISP:</span><span class="cis-isp">' + c.isp.toFixed(1) + '</span>' +
+        '<button class="arrow-btn" onclick="adjustCis(\''+norm(c.name)+'\',-1)">▼</button>' +
+        '<button class="arrow-btn" onclick="adjustCis(\''+norm(c.name)+'\',1)">▲</button>' +
+        '<select style="font-size:.72em;padding:1px 4px;border:1px solid var(--border);border-radius:3px;" onchange="moveCis(\''+norm(c.name)+'\',this.value)">' +
+        SECTORS.map(s2 => '<option value="'+s2.name+'"'+(s2.name===sec.name?' selected':'')+'>'+s2.name+'</option>').join('') +
+        '</select>' +
+        '</div>';
+    });
+    
+    html += '</div>';
+  });
+  
+  document.getElementById('cisContainer').innerHTML = html;
+}
+
+function adjustCis(cisName, delta) {
+  cisAdjustments[cisName] = (cisAdjustments[cisName] || 0) + delta;
+  updateAll();
+}
+
+function moveCis(cisName, newSectorName) {
+  // Remove from current sector
+  for (var i = 0; i < SECTORS.length; i++) {
+    var idx = SECTORS[i].cis.findIndex(c => norm(c) === cisName);
+    if (idx !== -1) {
+      SECTORS[i].cis.splice(idx, 1);
+      break;
+    }
+  }
+  // Add to new sector
+  for (var i = 0; i < SECTORS.length; i++) {
+    if (SECTORS[i].name === newSectorName) {
+      // Find original name
+      var origName = cisName;
+      for (var cn in CIS_GEO) { if (norm(cn) === cisName) { origName = cn; break; } }
+      SECTORS[i].cis.push(origName);
+      break;
+    }
+  }
+  updateAll();
+}
+</script>
+</body>
+</html>
