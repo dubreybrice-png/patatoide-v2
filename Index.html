@@ -156,7 +156,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <div class="summary-row"><span>ISP nécessaires</span><b id="sumNecessaires2">0</b></div>
       <div class="summary-row"><span>Recrutements nécessaires</span><b id="sumRecrut2">0</b></div>
     </div>
-    <div class="rebalance-msg" id="rebalanceMsg2" style="margin-bottom:12px;">⚠️ Vous devez replacer <b id="rebalanceDelta2">0</b> ISP</div>
     <div class="section-title">CIS par secteur — Répartition des recrutements</div>
     <div id="cisContainer"></div>
   </div>
@@ -184,7 +183,7 @@ var CIS_GEO = {
   'vallespir':{lat:42.4581,lng:2.6313},'saint laurent de cerdans':{lat:42.3853,lng:2.6101},
   'prats de mollo':{lat:42.4053,lng:2.4855},'cote vermeille':{lat:42.5170,lng:3.1040},
   'banyuls':{lat:42.4830,lng:3.1290},'cerbere':{lat:42.4424,lng:3.1685},
-  'thuir':{lat:42.6310,lng:2.7590},'riveral':{lat:42.6980,lng:2.7650}
+  'thuir':{lat:42.6310,lng:2.7590}
 };
 
 /* ═══ SECTEURS ═══ */
@@ -203,27 +202,34 @@ var SECTORS = [
   { name:'Montagne 2', cis:['porte cerdagne','saillagouse'], type:3, color:'#a29bfe', hPerIsp:36 }
 ];
 
-/* ═══ DONNÉES LIVE ═══ */
-var DATA = null;        // from server
-var cisIspCount = {};   // cisName (lower) → float ISP count
-var cisAdjustments = {}; // cisName → manual +/- from arrows
-var originalRecruitBySector = {}; // baseline per sector
+/* ═══ DONNÉES ═══ */
+var DATA = null;
+var cisIspCount = {};   // cisName (lower) → float ISP actuel (from spreadsheet)
+var cisTargets = {};    // cisName (lower) → int ISP cible (editable)
 
 /* ═══ TABS ═══ */
 function showTab(t) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  if (t === 'carte') { document.getElementById('viewCarte').classList.add('active'); document.querySelectorAll('.tab-btn')[0].classList.add('active'); }
-  else { document.getElementById('viewCis').classList.add('active'); document.querySelectorAll('.tab-btn')[1].classList.add('active'); }
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (t === 'carte') {
+    document.getElementById('viewCarte').classList.add('active');
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    setTimeout(function(){ if(mapObj) mapObj.invalidateSize(); }, 100);
+  } else {
+    document.getElementById('viewCis').classList.add('active');
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  }
 }
 
 /* ═══ INIT ═══ */
 google.script.run.withSuccessHandler(function(data) {
   DATA = data;
   computeIspCounts();
+  computeInitialTargets();
   document.getElementById('loadingBox').style.display = 'none';
   document.getElementById('sidebarContent').style.display = '';
   initMap();
+  setTimeout(function(){ if(mapObj) mapObj.invalidateSize(); }, 200);
   updateAll();
 }).getData();
 
@@ -231,17 +237,14 @@ function norm(s) { return (s||'').toString().trim().toLowerCase().replace(/\s+/g
 
 function computeIspCounts() {
   cisIspCount = {};
-  // Init all CIS to 0
   for (var i = 0; i < DATA.cis.length; i++) {
     cisIspCount[norm(DATA.cis[i].nom)] = 0;
   }
-  // Count ISP
   for (var i = 0; i < DATA.isp.length; i++) {
     var isp = DATA.isp[i];
     var cp = norm(isp.centrePrincipal);
     var cs = norm(isp.centreSecondaire);
     if (cp && cs) {
-      // Partage 50/50
       cisIspCount[cp] = (cisIspCount[cp] || 0) + 0.5;
       cisIspCount[cs] = (cisIspCount[cs] || 0) + 0.5;
     } else if (cp) {
@@ -250,18 +253,29 @@ function computeIspCounts() {
   }
 }
 
-function getEffectiveIsp(cisName) {
-  var base = cisIspCount[norm(cisName)] || 0;
-  var adj = cisAdjustments[norm(cisName)] || 0;
-  return base + adj;
+/* Compute initial targets: actual ISP + fair share of recruitment needed */
+function computeInitialTargets() {
+  cisTargets = {};
+  var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
+  SECTORS.forEach(function(sec) {
+    var covPct = getCovPct(sec.type);
+    var needed = calcNeededIsp(covPct, sec.hPerIsp);
+    var sectorActual = 0;
+    sec.cis.forEach(function(cn){ sectorActual += (cisIspCount[norm(cn)] || 0); });
+    var deficit = Math.max(0, Math.ceil(needed) - Math.ceil(sectorActual));
+    var nbCis = sec.cis.length || 1;
+    var base = Math.floor(deficit / nbCis);
+    var remainder = deficit - base * nbCis;
+    sec.cis.forEach(function(cn, i) {
+      var actual = cisIspCount[norm(cn)] || 0;
+      cisTargets[norm(cn)] = Math.ceil(actual) + base + (i < remainder ? 1 : 0);
+    });
+  });
 }
 
 /* ═══ CALCUL COUVERTURE ═══ */
-// 100% = 1 ISP 24h/24 tous les jours = 24h × 30.4j = 730h/mois
-// Si chaque ISP fait hPerIsp heures/mois, il faut (730 × covPct) / hPerIsp ISP
 function calcNeededIsp(covPct, hPerIsp) {
-  var totalHNeeded = 730 * (covPct / 100); // heures de couverture par mois
-  return totalHNeeded / hPerIsp;
+  return 730 * (covPct / 100) / hPerIsp;
 }
 
 function getCovPct(sectorType) {
@@ -276,95 +290,67 @@ var mapObj, zonePolys = [], zoneLabels = [];
 function initMap() {
   mapObj = L.map('map').setView([42.55, 2.55], 10);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© CARTO © OSM', maxZoom: 18
+    attribution: '&copy; CARTO &copy; OSM', maxZoom: 18
   }).addTo(mapObj);
-  
   mapObj.createPane('cisMarkers');
   mapObj.getPane('cisMarkers').style.zIndex = 650;
-  
-  // Légende
-  var leg = L.control({position:'bottomleft'});
-  leg.onAdd = function() {
-    var d = L.DomUtil.create('div','');
-    d.style.cssText = 'background:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.2);font-size:11px;line-height:1.8;';
-    d.innerHTML = '<strong>Légende</strong><br>' +
-      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--primary);"></span> Zone 1 ('+document.getElementById('sliderZ1').value+'%)<br>' +
-      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--orange);"></span> Zone 2 ('+document.getElementById('sliderZ2').value+'%)<br>' +
-      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue);"></span> Zone 3 ('+document.getElementById('sliderZ3').value+'%)';
-    return d;
-  };
-  leg.addTo(mapObj);
 }
 
 function drawMap() {
   if (!mapObj) return;
-  // Clear
-  zonePolys.forEach(l => mapObj.removeLayer(l));
-  zoneLabels.forEach(l => mapObj.removeLayer(l));
+  zonePolys.forEach(function(l){ mapObj.removeLayer(l); });
+  zoneLabels.forEach(function(l){ mapObj.removeLayer(l); });
   zonePolys = []; zoneLabels = [];
-  
-  // Remove old CIS markers
-  if (window._cisMarkers) window._cisMarkers.forEach(m => mapObj.removeLayer(m));
+  if (window._cisMarkers) window._cisMarkers.forEach(function(m){ mapObj.removeLayer(m); });
   window._cisMarkers = [];
-  
-  var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
-  
+
   SECTORS.forEach(function(sec) {
-    // Collect CIS coords for polygon
     var coords = [];
     sec.cis.forEach(function(cn) {
       var g = CIS_GEO[norm(cn)];
       if (g) coords.push([g.lat, g.lng]);
     });
     if (coords.length === 0) return;
-    
-    // Calc sector stats
+
     var covPct = getCovPct(sec.type);
-    var totalIsp = 0;
-    sec.cis.forEach(cn => { totalIsp += getEffectiveIsp(cn); });
-    var needed = calcNeededIsp(covPct, hPerIsp);
-    var recruit = Math.max(0, Math.ceil(needed - totalIsp));
-    var currentCov = needed > 0 ? Math.min(100, Math.round(totalIsp / needed * 100)) : 100;
-    
-    // Color based on status
-    var fillColor = sec.color;
+    var totalTarget = 0, totalActual = 0;
+    sec.cis.forEach(function(cn) {
+      totalTarget += (cisTargets[norm(cn)] || 0);
+      totalActual += (cisIspCount[norm(cn)] || 0);
+    });
+    var needed = calcNeededIsp(covPct, sec.hPerIsp);
+    var recruit = Math.max(0, Math.ceil(needed) - Math.ceil(totalActual));
+    var currentCov = needed > 0 ? Math.min(100, Math.round(totalActual / needed * 100)) : 100;
+
     var fillOpacity = currentCov >= 100 ? 0.15 : (currentCov >= 70 ? 0.25 : 0.35);
-    
-    // Create polygon (convex hull around CIS)
     var poly;
     if (coords.length === 1) {
-      // Circle for single point
-      poly = L.circle(coords[0], { radius: 8000, color: sec.color, weight: 2, fillColor: fillColor, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
+      poly = L.circle(coords[0], { radius: 8000, color: sec.color, weight: 2, fillColor: sec.color, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
     } else if (coords.length === 2) {
-      // Buffer the line
-      var buffered = bufferLine(coords[0], coords[1], 0.06);
-      poly = L.polygon(buffered, { color: sec.color, weight: 2, fillColor: fillColor, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
+      poly = L.polygon(bufferLine(coords[0], coords[1], 0.06), { color: sec.color, weight: 2, fillColor: sec.color, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
     } else {
-      var hull = convexHull(coords);
-      var expanded = expandPoly(hull, 0.04);
-      poly = L.polygon(expanded, { color: sec.color, weight: 2, fillColor: fillColor, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
+      poly = L.polygon(expandPoly(convexHull(coords), 0.04), { color: sec.color, weight: 2, fillColor: sec.color, fillOpacity: fillOpacity, dashArray: '6,4' }).addTo(mapObj);
     }
     poly._sectorName = sec.name;
-    poly.on('click', function() { hlSector(sec.name); });
+    poly.on('click', function(){ hlSector(sec.name); });
     zonePolys.push(poly);
-    
-    // Label at centroid
+
     var ct = centroid(coords);
     var statusIcon = currentCov >= 100 ? '✅' : (currentCov >= 70 ? '⚠️' : '🔴');
     var labelHtml = '<div style="background:'+sec.color+';color:#fff;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.3);text-align:center;pointer-events:none;">'+
-      sec.name+'<br>'+statusIcon+' '+Math.round(totalIsp)+'/'+Math.ceil(needed)+' ISP'+
+      sec.name+'<br>'+statusIcon+' '+Math.round(totalActual)+'/'+Math.ceil(needed)+' ISP'+
       (recruit > 0 ? '<br><span style="background:#fff;color:'+sec.color+';padding:1px 5px;border-radius:3px;font-size:9px;">+'+recruit+' à recruter</span>' : '')+
       '</div>';
     var lbl = L.marker(ct, { icon: L.divIcon({ className:'', html: labelHtml, iconSize: null, iconAnchor:[50,20] }) }).addTo(mapObj);
     zoneLabels.push(lbl);
-    
-    // CIS markers
+
     sec.cis.forEach(function(cn) {
       var g = CIS_GEO[norm(cn)];
       if (!g) return;
-      var ispCount = getEffectiveIsp(cn);
-      var tip = '<strong>' + cn + '</strong><br>Secteur: ' + sec.name + '<br>ISP: <strong>' + ispCount.toFixed(1) + '</strong>';
-      var m = L.circleMarker([g.lat, g.lng], { pane:'cisMarkers', radius: Math.max(4, Math.min(12, ispCount * 1.5 + 3)), fillColor: sec.color, color:'#fff', weight:2, fillOpacity:.9 })
+      var actual = cisIspCount[norm(cn)] || 0;
+      var target = cisTargets[norm(cn)] || 0;
+      var tip = '<strong>'+cn+'</strong><br>Secteur: '+sec.name+'<br>ISP actuel: <strong>'+actual.toFixed(1)+'</strong><br>ISP cible: <strong>'+target+'</strong>';
+      var m = L.circleMarker([g.lat, g.lng], { pane:'cisMarkers', radius: Math.max(4, Math.min(12, actual*1.5+3)), fillColor: sec.color, color:'#fff', weight:2, fillOpacity:.9 })
         .addTo(mapObj).bindTooltip(tip, {direction:'top', offset:[0,-8]});
       window._cisMarkers.push(m);
     });
@@ -373,39 +359,39 @@ function drawMap() {
 
 /* ═══ GEOMETRY HELPERS ═══ */
 function centroid(pts) {
-  var lat = 0, lng = 0;
-  pts.forEach(p => { lat += p[0]; lng += p[1]; });
-  return [lat / pts.length, lng / pts.length];
+  var lat=0, lng=0;
+  pts.forEach(function(p){ lat+=p[0]; lng+=p[1]; });
+  return [lat/pts.length, lng/pts.length];
 }
-
 function convexHull(points) {
-  var pts = points.slice().sort((a,b) => a[1]-b[1] || a[0]-b[0]);
+  var pts = points.slice().sort(function(a,b){ return a[1]-b[1] || a[0]-b[0]; });
   if (pts.length <= 2) return pts;
-  var cross = (O,A,B) => (A[0]-O[0])*(B[1]-O[1]) - (A[1]-O[1])*(B[0]-O[0]);
+  var cross = function(O,A,B){ return (A[0]-O[0])*(B[1]-O[1])-(A[1]-O[1])*(B[0]-O[0]); };
   var lower = [];
-  for (var i = 0; i < pts.length; i++) { while (lower.length >= 2 && cross(lower[lower.length-2],lower[lower.length-1],pts[i]) <= 0) lower.pop(); lower.push(pts[i]); }
+  for (var i=0; i<pts.length; i++) { while(lower.length>=2 && cross(lower[lower.length-2],lower[lower.length-1],pts[i])<=0) lower.pop(); lower.push(pts[i]); }
   var upper = [];
-  for (var i = pts.length-1; i >= 0; i--) { while (upper.length >= 2 && cross(upper[upper.length-2],upper[upper.length-1],pts[i]) <= 0) upper.pop(); upper.push(pts[i]); }
+  for (var i=pts.length-1; i>=0; i--) { while(upper.length>=2 && cross(upper[upper.length-2],upper[upper.length-1],pts[i])<=0) upper.pop(); upper.push(pts[i]); }
   upper.pop(); lower.pop();
   return lower.concat(upper);
 }
-
 function expandPoly(pts, d) {
   var ct = centroid(pts);
-  return pts.map(p => [ct[0] + (p[0]-ct[0])*(1+d/Math.max(0.001,Math.sqrt((p[0]-ct[0])**2+(p[1]-ct[1])**2))*0.5), ct[1] + (p[1]-ct[1])*(1+d/Math.max(0.001,Math.sqrt((p[0]-ct[0])**2+(p[1]-ct[1])**2))*0.5)]);
+  return pts.map(function(p) {
+    var dist = Math.max(0.001, Math.sqrt(Math.pow(p[0]-ct[0],2)+Math.pow(p[1]-ct[1],2)));
+    return [ct[0]+(p[0]-ct[0])*(1+d/dist*0.5), ct[1]+(p[1]-ct[1])*(1+d/dist*0.5)];
+  });
 }
-
 function bufferLine(a, b, d) {
-  var dx = b[1]-a[1], dy = b[0]-a[0], len = Math.sqrt(dx*dx+dy*dy) || 1;
-  var nx = -dy/len*d, ny = dx/len*d;
+  var dx=b[1]-a[1], dy=b[0]-a[0], len=Math.sqrt(dx*dx+dy*dy)||1;
+  var nx=-dy/len*d, ny=dx/len*d;
   return [[a[0]+nx,a[1]+ny],[b[0]+nx,b[1]+ny],[b[0]-nx,b[1]-ny],[a[0]-nx,a[1]-ny]];
 }
 
 /* ═══ HIGHLIGHT SECTOR ═══ */
 function hlSector(name) {
-  document.querySelectorAll('.sector-card').forEach(c => c.classList.toggle('active', c.getAttribute('data-s') === name));
-  zonePolys.forEach(p => {
-    if (p._sectorName === name) { if (p.getBounds) mapObj.fitBounds(p.getBounds().pad(.3)); p.setStyle({fillOpacity:.35,weight:3}); }
+  document.querySelectorAll('.sector-card').forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-s')===name); });
+  zonePolys.forEach(function(p) {
+    if (p._sectorName===name) { if(p.getBounds) mapObj.fitBounds(p.getBounds().pad(.3)); p.setStyle({fillOpacity:.35,weight:3}); }
     else { p.setStyle({fillOpacity:.15,weight:2}); }
   });
 }
@@ -417,149 +403,140 @@ function updateAll() {
   document.getElementById('valZ1').textContent = document.getElementById('sliderZ1').value + '%';
   document.getElementById('valZ2').textContent = document.getElementById('sliderZ2').value + '%';
   document.getElementById('valZ3').textContent = document.getElementById('sliderZ3').value + '%';
-  
+
   var totalActuels = 0, totalNeeded = 0, totalRecruit = 0;
   var sectorHtml = '';
-  
+
   SECTORS.forEach(function(sec, idx) {
     var covPct = getCovPct(sec.type);
     var sectorIsp = 0;
-    sec.cis.forEach(cn => { sectorIsp += getEffectiveIsp(cn); });
-    var needed = calcNeededIsp(covPct, hPerIsp);
-    var recruit = Math.max(0, Math.ceil(needed - sectorIsp));
+    sec.cis.forEach(function(cn){ sectorIsp += (cisIspCount[norm(cn)] || 0); });
+    var needed = calcNeededIsp(covPct, sec.hPerIsp);
+    var recruit = Math.max(0, Math.ceil(needed) - Math.ceil(sectorIsp));
     var currentCov = needed > 0 ? Math.min(100, Math.round(sectorIsp / needed * 100)) : 100;
-    
+
     totalActuels += sectorIsp;
     totalNeeded += needed;
     totalRecruit += recruit;
-    
+
     var statusCls = currentCov >= 100 ? 'ok' : (currentCov >= 70 ? 'warn' : 'crit');
-    var typeLabel = 'Zone ' + sec.type;
-    
-    sectorHtml += '<div class="sector-card" data-s="' + sec.name + '" style="border-left-color:' + sec.color + ';" onclick="hlSector(\'' + sec.name + '\')">' +
-      '<div class="sector-name"><span style="color:'+sec.color+';">■</span> ' + sec.name + 
+    sectorHtml += '<div class="sector-card" data-s="'+sec.name+'" style="border-left-color:'+sec.color+';" onclick="hlSector(\''+sec.name+'\')">' +
+      '<div class="sector-name"><span style="color:'+sec.color+';">■</span> '+sec.name+
       ' <select class="sector-type-select" onchange="changeSectorType('+idx+',this.value)" onclick="event.stopPropagation()">' +
       '<option value="1"'+(sec.type===1?' selected':'')+'>Zone 1</option>' +
       '<option value="2"'+(sec.type===2?' selected':'')+'>Zone 2</option>' +
       '<option value="3"'+(sec.type===3?' selected':'')+'>Zone 3</option></select></div>' +
       '<div class="sector-stats">' +
-      '<div class="st '+statusCls+'"><b>' + sectorIsp.toFixed(1) + '</b>actuels</div>' +
-      '<div class="st"><b>' + Math.ceil(needed) + '</b>nécessaires</div>' +
-      '<div class="st '+(recruit>0?'crit':'ok')+'"><b>' + (recruit > 0 ? '+'+recruit : '✓') + '</b>recrutement</div>' +
+      '<div class="st '+statusCls+'"><b>'+sectorIsp.toFixed(1)+'</b>actuels</div>' +
+      '<div class="st"><b>'+Math.ceil(needed)+'</b>nécessaires</div>' +
+      '<div class="st '+(recruit>0?'crit':'ok')+'"><b>'+(recruit>0?'+'+recruit:'✓')+'</b>recrutement</div>' +
       '</div>' +
       '<div class="sector-slider-row" onclick="event.stopPropagation()"><span>⏱ h/ISP:</span>' +
       '<input type="range" min="12" max="72" value="'+sec.hPerIsp+'" step="1" oninput="changeSectorH('+idx+',this.value)">' +
-      '<span style="font-weight:700;min-width:35px;">'+sec.hPerIsp+'h</span></div>' +
-      '</div>';
+      '<span style="font-weight:700;min-width:35px;">'+sec.hPerIsp+'h</span></div></div>';
   });
-  
+
   document.getElementById('sectorsContainer').innerHTML = sectorHtml;
-  
-  // Summary
+
   ['','2'].forEach(function(s) {
     var el = document.getElementById('sumActuels'+s);
-    if (el) el.textContent = Math.round(totalActuels);
+    if(el) el.textContent = Math.round(totalActuels);
     el = document.getElementById('sumNecessaires'+s);
-    if (el) el.textContent = Math.ceil(totalNeeded);
+    if(el) el.textContent = Math.ceil(totalNeeded);
     el = document.getElementById('sumRecrut'+s);
-    if (el) el.textContent = totalRecruit > 0 ? '+' + totalRecruit : '0';
+    if(el) el.textContent = totalRecruit > 0 ? '+'+totalRecruit : '0';
   });
-  
-  // Check rebalance
-  var totalAdj = 0;
-  for (var k in cisAdjustments) totalAdj += cisAdjustments[k];
-  ['','2'].forEach(function(s) {
-    var msg = document.getElementById('rebalanceMsg'+s);
-    if (totalAdj !== 0) {
-      msg.style.display = 'block';
-      document.getElementById('rebalanceDelta'+s).textContent = (totalAdj > 0 ? '+' : '') + totalAdj;
-    } else {
-      msg.style.display = 'none';
-    }
-  });
-  
+
+  // Remove global rebalance — now per-sector in CIS tab
+  document.getElementById('rebalanceMsg').style.display = 'none';
+
   drawMap();
   renderCisTab();
 }
 
-function changeSectorType(idx, val) {
-  SECTORS[idx].type = parseInt(val);
-  updateAll();
-}
-
-function changeSectorH(idx, val) {
-  SECTORS[idx].hPerIsp = parseInt(val);
-  updateAll();
-}
+function changeSectorType(idx, val) { SECTORS[idx].type = parseInt(val); computeInitialTargets(); updateAll(); }
+function changeSectorH(idx, val) { SECTORS[idx].hPerIsp = parseInt(val); computeInitialTargets(); updateAll(); }
 
 /* ═══ CIS TAB ═══ */
 function renderCisTab() {
-  var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
   var html = '';
-  
-  SECTORS.forEach(function(sec) {
+
+  SECTORS.forEach(function(sec, sIdx) {
     var covPct = getCovPct(sec.type);
-    var sectorIsp = 0;
-    sec.cis.forEach(cn => { sectorIsp += getEffectiveIsp(cn); });
-    var needed = calcNeededIsp(covPct, hPerIsp);
-    var recruit = Math.max(0, Math.ceil(needed - sectorIsp));
-    
-    // Distribute recruitment proportionally across CIS
-    var cisData = sec.cis.map(function(cn) {
-      return { name: cn, isp: getEffectiveIsp(cn), baseIsp: cisIspCount[norm(cn)] || 0 };
+    var needed = calcNeededIsp(covPct, sec.hPerIsp);
+    var neededCeil = Math.ceil(needed);
+
+    // Sum actual and targets for this sector
+    var sectorActual = 0, sectorTarget = 0;
+    sec.cis.forEach(function(cn) {
+      sectorActual += (cisIspCount[norm(cn)] || 0);
+      sectorTarget += (cisTargets[norm(cn)] || 0);
     });
-    var totalCisIsp = cisData.reduce((s,c) => s + c.isp, 0) || 1;
-    
+    var recruit = Math.max(0, neededCeil - Math.ceil(sectorActual));
+
+    // Per-sector rebalance check: sum of targets should equal neededCeil (or sectorActual if no deficit)
+    var expectedTargetSum = Math.max(neededCeil, Math.ceil(sectorActual));
+    var delta = sectorTarget - expectedTargetSum;
+    var hasRebalance = delta !== 0;
+
     html += '<div class="cis-zone-group">';
     html += '<div class="cis-zone-header" style="background:'+sec.color+'22;border-left:4px solid '+sec.color+';">' +
       '<span style="color:'+sec.color+';"><b>'+sec.name+'</b> (Zone '+sec.type+')</span>' +
-      '<span>'+sectorIsp.toFixed(1)+'/'+Math.ceil(needed)+' ISP — '+(recruit>0?'<b style="color:var(--primary);">+'+recruit+' recrut.</b>':'<b style="color:var(--green);">✓ OK</b>')+'</span></div>';
-    
-    cisData.forEach(function(c) {
-      var cisRecruit = recruit > 0 ? Math.round(recruit * (c.isp / totalCisIsp) || (1/cisData.length)) : 0;
-      var adj = cisAdjustments[norm(c.name)] || 0;
-      
+      '<span>'+sectorActual.toFixed(1)+'/'+neededCeil+' ISP — '+(recruit>0?'<b style="color:var(--primary);">+'+recruit+' recrut.</b>':'<b style="color:var(--green);">✓ OK</b>')+'</span></div>';
+
+    // Rebalance warning per sector
+    if (hasRebalance) {
+      var msg = delta > 0
+        ? '⚠️ Vous devez <b>enlever '+delta+' ISP cible</b> dans ce secteur'
+        : '⚠️ Vous devez <b>ajouter '+Math.abs(delta)+' ISP cible</b> dans ce secteur';
+      html += '<div style="background:#fff3cd;color:#856404;padding:6px 10px;font-size:.78em;font-weight:600;text-align:center;">'+msg+'</div>';
+    }
+
+    sec.cis.forEach(function(cn) {
+      var actual = cisIspCount[norm(cn)] || 0;
+      var target = cisTargets[norm(cn)] || 0;
+      var diff = target - Math.ceil(actual);
+
       html += '<div class="cis-row">' +
-        '<span class="cis-name">' + c.name + '</span>' +
-        '<span style="font-size:.72em;color:var(--text-light);">ISP:</span><span class="cis-isp">' + c.isp.toFixed(1) + '</span>' +
-        '<button class="arrow-btn" onclick="adjustCis(\''+norm(c.name)+'\',-1)">▼</button>' +
-        '<button class="arrow-btn" onclick="adjustCis(\''+norm(c.name)+'\',1)">▲</button>' +
-        '<select style="font-size:.72em;padding:1px 4px;border:1px solid var(--border);border-radius:3px;" onchange="moveCis(\''+norm(c.name)+'\',this.value)">' +
-        SECTORS.map(s2 => '<option value="'+s2.name+'"'+(s2.name===sec.name?' selected':'')+'>'+s2.name+'</option>').join('') +
-        '</select>' +
-        '</div>';
+        '<span class="cis-name"><b>'+cn+'</b> <span style="color:var(--text-light);font-size:.9em;">— ISP actuel: '+actual.toFixed(1)+'</span></span>' +
+        '<span style="font-size:.72em;color:var(--text-light);margin-right:2px;">Cible:</span>' +
+        '<span class="cis-isp" style="'+(diff>0?'color:var(--primary);':'color:var(--green);')+'">'+target+'</span>' +
+        '<button class="arrow-btn" onclick="adjustTarget(\''+norm(cn)+'\','+sIdx+',-1)">▼</button>' +
+        '<button class="arrow-btn" onclick="adjustTarget(\''+norm(cn)+'\','+sIdx+',1)">▲</button>' +
+        (diff > 0 ? '<span style="font-size:.72em;color:var(--primary);font-weight:700;margin-left:4px;">+'+diff+' recrut.</span>' : '<span style="font-size:.72em;color:var(--green);font-weight:700;margin-left:4px;">✓</span>') +
+        '<select style="font-size:.72em;padding:1px 4px;border:1px solid var(--border);border-radius:3px;margin-left:4px;" onchange="moveCis(\''+norm(cn)+'\',this.value)">' +
+        SECTORS.map(function(s2){ return '<option value="'+s2.name+'"'+(s2.name===sec.name?' selected':'')+'>'+s2.name+'</option>'; }).join('') +
+        '</select></div>';
     });
-    
+
     html += '</div>';
   });
-  
+
   document.getElementById('cisContainer').innerHTML = html;
 }
 
-function adjustCis(cisName, delta) {
-  cisAdjustments[cisName] = (cisAdjustments[cisName] || 0) + delta;
-  updateAll();
+function adjustTarget(cisName, sectorIdx, delta) {
+  var current = cisTargets[cisName] || 0;
+  var newVal = current + delta;
+  if (newVal < 0) newVal = 0;
+  cisTargets[cisName] = newVal;
+  renderCisTab(); // Only re-render CIS tab, no need to recalc everything
 }
 
 function moveCis(cisName, newSectorName) {
-  // Remove from current sector
   for (var i = 0; i < SECTORS.length; i++) {
-    var idx = SECTORS[i].cis.findIndex(c => norm(c) === cisName);
-    if (idx !== -1) {
-      SECTORS[i].cis.splice(idx, 1);
-      break;
-    }
+    var idx = SECTORS[i].cis.findIndex(function(c){ return norm(c) === cisName; });
+    if (idx !== -1) { SECTORS[i].cis.splice(idx, 1); break; }
   }
-  // Add to new sector
   for (var i = 0; i < SECTORS.length; i++) {
     if (SECTORS[i].name === newSectorName) {
-      // Find original name
       var origName = cisName;
       for (var cn in CIS_GEO) { if (norm(cn) === cisName) { origName = cn; break; } }
       SECTORS[i].cis.push(origName);
       break;
     }
   }
+  computeInitialTargets();
   updateAll();
 }
 </script>
