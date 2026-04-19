@@ -481,21 +481,24 @@ function renderCisTab() {
     });
     var recruit = Math.max(0, neededCeil - Math.ceil(sectorActual));
 
-    // Per-sector rebalance check
-    var expectedTargetSum = recruit > 0 ? neededCeil : Math.ceil(sectorActual);
-    var delta = sectorTarget - expectedTargetSum;
-    var hasRebalance = delta !== 0;
+    // Per-sector rebalance check — only warn if there IS a deficit
+    var hasRebalance = false;
+    if (recruit > 0) {
+      var delta = sectorTarget - neededCeil;
+      if (delta !== 0) {
+        hasRebalance = true;
+        var msg = delta > 0
+          ? '⚠️ Vous devez <b>enlever '+delta+' ISP cible</b> dans ce secteur'
+          : '⚠️ Vous devez <b>ajouter '+Math.abs(delta)+' ISP cible</b> dans ce secteur';
+      }
+    }
 
     html += '<div class="cis-zone-group">';
     html += '<div class="cis-zone-header" style="background:'+sec.color+'22;border-left:4px solid '+sec.color+';">' +
       '<span style="color:'+sec.color+';"><b>'+sec.name+'</b> (Zone '+sec.type+')</span>' +
       '<span>'+sectorActual.toFixed(1)+'/'+neededCeil+' ISP — '+(recruit>0?'<b style="color:var(--primary);">+'+recruit+' recrut.</b>':'<b style="color:var(--green);">✓ OK</b>')+'</span></div>';
 
-    // Rebalance warning per sector
     if (hasRebalance) {
-      var msg = delta > 0
-        ? '⚠️ Vous devez <b>enlever '+delta+' ISP cible</b> dans ce secteur'
-        : '⚠️ Vous devez <b>ajouter '+Math.abs(delta)+' ISP cible</b> dans ce secteur';
       html += '<div style="background:#fff3cd;color:#856404;padding:6px 10px;font-size:.78em;font-weight:600;text-align:center;">'+msg+'</div>';
     }
 
