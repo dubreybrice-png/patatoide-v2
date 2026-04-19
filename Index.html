@@ -344,9 +344,9 @@ function drawMap() {
 
     var ct = centroid(coords);
     var statusIcon = currentCov >= 100 ? '✅' : (currentCov >= 70 ? '⚠️' : '🔴');
-    var labelHtml = '<div style="background:'+sec.color+';color:#fff;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.3);text-align:center;pointer-events:none;">'+
+    var labelHtml = '<div style="background:'+sec.color+';color:#fff;padding:5px 10px;border-radius:6px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.3);text-align:center;pointer-events:none;">'+
       sec.name+'<br>'+statusIcon+' '+Math.round(totalActual)+'/'+Math.ceil(needed)+' ISP'+
-      (recruit > 0 ? '<br><span style="background:#fff;color:'+sec.color+';padding:1px 5px;border-radius:3px;font-size:9px;">+'+recruit+' à recruter</span>' : '')+
+      (recruit > 0 ? '<br><span style="background:#fff;color:'+sec.color+';padding:2px 6px;border-radius:3px;font-size:11px;">+'+recruit+' à recruter</span>' : '')+
       '</div>';
     var lbl = L.marker(ct, { icon: L.divIcon({ className:'', html: labelHtml, iconSize: null, iconAnchor:[50,20] }) }).addTo(mapObj);
     zoneLabels.push(lbl);
