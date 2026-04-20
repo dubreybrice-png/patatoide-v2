@@ -477,7 +477,7 @@ function updateAll() {
     var covPct = getCovPct(sec.type);
     var sectorIsp = 0;
     sec.cis.forEach(function(cn){ sectorIsp += (cisIspCount[norm(cn)] || 0); });
-    var needed = calcNeededIsp(covPct, sec.hPerIsp);
+    var needed = calcNeededIsp(covPct, hPerIsp);
     var recruit = Math.max(0, Math.ceil(needed) - Math.ceil(sectorIsp));
     var currentCov = needed > 0 ? Math.min(100, Math.round(sectorIsp / needed * 100)) : 100;
 
@@ -498,8 +498,8 @@ function updateAll() {
       '<div class="st '+(recruit>0?'crit':'ok')+'"><b>'+(recruit>0?'+'+recruit:'✓')+'</b>recrutement</div>' +
       '</div>' +
       '<div class="sector-slider-row" onclick="event.stopPropagation()"><span>⏱ h/ISP:</span>' +
-      '<input type="range" min="12" max="72" value="'+sec.hPerIsp+'" step="1" oninput="changeSectorH('+idx+',this.value)">' +
-      '<span style="font-weight:700;min-width:35px;">'+sec.hPerIsp+'h</span></div></div>';
+      '<input type="range" min="12" max="72" value="'+hPerIsp+'" step="1" oninput="changeSectorH('+idx+',this.value)">' +
+      '<span style="font-weight:700;min-width:35px;">'+hPerIsp+'h</span></div></div>';
   });
 
   document.getElementById('sectorsContainer').innerHTML = sectorHtml;
