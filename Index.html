@@ -530,7 +530,8 @@ function renderCisTab() {
 
   SECTORS.forEach(function(sec, sIdx) {
     var covPct = getCovPct(sec.type);
-    var needed = calcNeededIsp(covPct, sec.hPerIsp);
+    var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
+    var needed = calcNeededIsp(covPct, hPerIsp);
     var neededCeil = Math.ceil(needed);
 
     // Sum actual and targets for this sector
