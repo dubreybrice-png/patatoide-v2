@@ -124,7 +124,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
           <div style="font-size:.78em;font-weight:600;margin-top:4px;">Taux couverture par type de zone :</div>
           <div class="zone-type-row">
             <label style="color:var(--primary);">Zone 1</label>
-            <input type="range" id="sliderZ1" min="10" max="100" value="80" step="5" oninput="updateAll()">
+            <input type="range" id="sliderZ1" min="10" max="100" value="100" step="5" oninput="updateAll()">
             <span class="val" id="valZ1">80%</span>
           </div>
           <div class="zone-type-row">
@@ -189,17 +189,17 @@ var CIS_GEO = {
 /* ═══ SECTEURS ═══ */
 var SECTORS = [
   { name:'Agglo', cis:['perpignan ouest','perpignan nord','perpignan sud'], type:1, color:'#e63946', hPerIsp:36 },
-  { name:'Albères', cis:['saint cyprien','elne','palau','argeles'], type:2, color:'#e76f51', hPerIsp:36 },
+  { name:'Albères', cis:['saint cyprien','elne','palau','argeles'], type:2, color:'#e67e22', hPerIsp:36 },
   { name:'Albères Côtier', cis:['cote vermeille','banyuls','cerbere'], type:3, color:'#e84393', hPerIsp:36 },
-  { name:'Nord Côtier', cis:['le barcares','salanque','canet'], type:2, color:'#f39c12', hPerIsp:36 },
+  { name:'Nord Côtier', cis:['le barcares','salanque','canet'], type:2, color:'#e67e22', hPerIsp:36 },
   { name:'Nord', cis:['agly','vingrau','baixas','rivesaltes','salses'], type:2, color:'#e67e22', hPerIsp:36 },
-  { name:'Centre', cis:['ille sur tet','millas','riberal','les aspres'], type:2, color:'#d35400', hPerIsp:36 },
-  { name:'Vallespir 1', cis:['ceret','boulou'], type:2, color:'#f57c00', hPerIsp:36 },
-  { name:'Vallespir 2', cis:['prats de mollo','vallespir','saint laurent de cerdans'], type:3, color:'#d81b60', hPerIsp:36 },
-  { name:'Fenouillèdes', cis:['caudies','saint paul de fenouillet','maury','sournia'], type:3, color:'#c2185b', hPerIsp:36 },
-  { name:'Conflent', cis:['olette','vernet','prades','vinca'], type:2, color:'#ef6c00', hPerIsp:36 },
-  { name:'Montagne 1', cis:['capcir','font romeu','mont louis'], type:3, color:'#ad1457', hPerIsp:36 },
-  { name:'Montagne 2', cis:['porte puymorens','saillagouse','cerdagne'], type:3, color:'#880e4f', hPerIsp:36 }
+  { name:'Centre', cis:['ille sur tet','millas','riberal','les aspres'], type:2, color:'#e67e22', hPerIsp:36 },
+  { name:'Vallespir 1', cis:['ceret','boulou'], type:2, color:'#e67e22', hPerIsp:36 },
+  { name:'Vallespir 2', cis:['prats de mollo','vallespir','saint laurent de cerdans'], type:3, color:'#e84393', hPerIsp:36 },
+  { name:'Fenouillèdes', cis:['caudies','saint paul de fenouillet','maury','sournia'], type:3, color:'#e84393', hPerIsp:36 },
+  { name:'Conflent', cis:['olette','vernet','prades','vinca'], type:2, color:'#e67e22', hPerIsp:36 },
+  { name:'Montagne 1', cis:['capcir','font romeu','mont louis'], type:3, color:'#e84393', hPerIsp:36 },
+  { name:'Montagne 2', cis:['porte puymorens','saillagouse','cerdagne'], type:3, color:'#e84393', hPerIsp:36 }
 ];
 
 /* ═══ DONNÉES ═══ */
