@@ -183,7 +183,7 @@ var CIS_GEO = {
   'vallespir':{lat:42.4581,lng:2.6313},'saint laurent de cerdans':{lat:42.3853,lng:2.6101},
   'prats de mollo':{lat:42.4053,lng:2.4855},'cote vermeille':{lat:42.5170,lng:3.1040},
   'banyuls':{lat:42.4830,lng:3.1290},'cerbere':{lat:42.4424,lng:3.1685},
-  'thuir':{lat:42.6310,lng:2.7590}
+  'cerdagne':{lat:42.4328,lng:1.9531}
 };
 
 /* ═══ SECTEURS ═══ */
@@ -193,13 +193,13 @@ var SECTORS = [
   { name:'Albères Côtier', cis:['cote vermeille','banyuls','cerbere'], type:3, color:'#e84393', hPerIsp:36 },
   { name:'Nord Côtier', cis:['le barcares','salanque','canet'], type:2, color:'#f39c12', hPerIsp:36 },
   { name:'Nord', cis:['agly','vingrau','baixas','rivesaltes','salses'], type:2, color:'#e67e22', hPerIsp:36 },
-  { name:'Centre', cis:['ille sur tet','millas','riberal','thuir'], type:2, color:'#d35400', hPerIsp:36 },
+  { name:'Centre', cis:['ille sur tet','millas','riberal','les aspres'], type:2, color:'#d35400', hPerIsp:36 },
   { name:'Vallespir 1', cis:['ceret','boulou'], type:2, color:'#f57c00', hPerIsp:36 },
   { name:'Vallespir 2', cis:['prats de mollo','vallespir','saint laurent de cerdans'], type:3, color:'#d81b60', hPerIsp:36 },
   { name:'Fenouillèdes', cis:['caudies','saint paul de fenouillet','maury','sournia'], type:3, color:'#c2185b', hPerIsp:36 },
   { name:'Conflent', cis:['olette','vernet','prades','vinca'], type:2, color:'#ef6c00', hPerIsp:36 },
   { name:'Montagne 1', cis:['capcir','font romeu','mont louis'], type:3, color:'#ad1457', hPerIsp:36 },
-  { name:'Montagne 2', cis:['porte puymorens','saillagouse'], type:3, color:'#880e4f', hPerIsp:36 }
+  { name:'Montagne 2', cis:['porte puymorens','saillagouse','cerdagne'], type:3, color:'#880e4f', hPerIsp:36 }
 ];
 
 /* ═══ DONNÉES ═══ */
@@ -270,7 +270,10 @@ var CIS_ALIAS = {
   'elne':'elne','millas':'millas','prades':'prades','olette':'olette',
   'maury':'maury','sournia':'sournia','vinca':'vinca',
   'caudies':'caudies','caudies de fenouilledes':'caudies',
-  'capcir':'capcir','vallespir':'vallespir'
+  'capcir':'capcir','vallespir':'vallespir',
+  'st laurent de cerdans':'saint laurent de cerdans',
+  'st paul de fenouillet':'saint paul de fenouillet',
+  'cerdagne':'cerdagne','bourg madame':'cerdagne'
 };
 
 function resolveAlias(n) {
