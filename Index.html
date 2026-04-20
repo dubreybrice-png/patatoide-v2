@@ -318,7 +318,7 @@ function computeInitialTargets() {
   var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
   SECTORS.forEach(function(sec) {
     var covPct = getCovPct(sec.type);
-    var needed = calcNeededIsp(covPct, sec.hPerIsp);
+    var needed = calcNeededIsp(covPct, hPerIsp);
     var sectorActual = 0;
     sec.cis.forEach(function(cn){ sectorActual += (cisIspCount[norm(cn)] || 0); });
     var deficit = Math.max(0, Math.ceil(needed) - Math.ceil(sectorActual));
