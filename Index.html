@@ -171,7 +171,7 @@ var CIS_GEO = {
   'rivesaltes':{lat:42.7702,lng:2.8770},'salanque':{lat:42.7714,lng:2.9936},
   'salses':{lat:42.8367,lng:2.9208},'saint paul de fenouillet':{lat:42.8109,lng:2.5030},
   'vingrau':{lat:42.8591,lng:2.7382},'capcir':{lat:42.5718,lng:2.0695},
-  'porte cerdagne':{lat:42.4323,lng:1.9485},'font romeu':{lat:42.5044,lng:2.0370},
+  'porte puymorens':{lat:42.4323,lng:1.9485},'font romeu':{lat:42.5044,lng:2.0370},
   'ille sur tet':{lat:42.6710,lng:2.6210},'mont louis':{lat:42.5106,lng:2.1213},
   'olette':{lat:42.5430,lng:2.2750},'prades':{lat:42.6177,lng:2.4216},
   'saillagouse':{lat:42.4590,lng:2.0370},'sournia':{lat:42.7316,lng:2.4317},
@@ -199,7 +199,7 @@ var SECTORS = [
   { name:'Fenouillèdes', cis:['caudies','saint paul de fenouillet','maury','sournia'], type:3, color:'#c2185b', hPerIsp:36 },
   { name:'Conflent', cis:['olette','vernet','prades','vinca'], type:2, color:'#ef6c00', hPerIsp:36 },
   { name:'Montagne 1', cis:['capcir','font romeu','mont louis'], type:3, color:'#ad1457', hPerIsp:36 },
-  { name:'Montagne 2', cis:['porte cerdagne','saillagouse'], type:3, color:'#880e4f', hPerIsp:36 }
+  { name:'Montagne 2', cis:['porte puymorens','saillagouse'], type:3, color:'#880e4f', hPerIsp:36 }
 ];
 
 /* ═══ DONNÉES ═══ */
@@ -233,17 +233,71 @@ google.script.run.withSuccessHandler(function(data) {
   updateAll();
 }).getData();
 
-function norm(s) { return (s||'').toString().trim().toLowerCase().replace(/\s+/g,' '); }
+function norm(s) {
+  return (s||'').toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[-_']/g,' ').replace(/\s+/g,' ');
+}
+
+/* Alias: map spreadsheet names → CIS_GEO keys */
+var CIS_ALIAS = {
+  'argeles sur mer':'argeles','argeles-sur-mer':'argeles',
+  'le boulou':'boulou',
+  'canet en roussillon':'canet','canet-en-roussillon':'canet',
+  'le barcares':'le barcares',
+  'saint cyprien':'saint cyprien','st cyprien':'saint cyprien',
+  'st paul de fenouillet':'saint paul de fenouillet',
+  'st laurent de cerdans':'saint laurent de cerdans',
+  'prats de mollo la preste':'prats de mollo','prats':'prats de mollo',
+  'vernet les bains':'vernet','vernet-les-bains':'vernet',
+  'ille sur tet':'ille sur tet','ille-sur-tet':'ille sur tet',
+  'font romeu odeillo via':'font romeu','font-romeu':'font romeu',
+  'mont louis':'mont louis','mont-louis':'mont louis',
+  'porte puymorens':'porte puymorens','porte':'porte puymorens',
+  'cote vermeille':'cote vermeille','collioure':'cote vermeille','port vendres':'cote vermeille',
+  'thuir':'thuir','les aspres':'les aspres','thuir (les aspres)':'thuir',
+  'saillagouse':'saillagouse',
+  'palau del vidre':'palau','palau-del-vidre':'palau',
+  'ceret':'ceret',
+  'banyuls sur mer':'banyuls','banyuls-sur-mer':'banyuls',
+  'cerbere':'cerbere',
+  'rivesaltes':'rivesaltes',
+  'perpignan nord':'perpignan nord','perpignan sud':'perpignan sud','perpignan ouest':'perpignan ouest',
+  'riberal':'riberal','le riberal':'riberal',
+  'salanque':'salanque','la salanque':'salanque',
+  'baixas':'baixas','agly':'agly','vingrau':'vingrau','salses':'salses',
+  'salses le chateau':'salses',
+  'elne':'elne','millas':'millas','prades':'prades','olette':'olette',
+  'maury':'maury','sournia':'sournia','vinca':'vinca',
+  'caudies':'caudies','caudies de fenouilledes':'caudies',
+  'capcir':'capcir','vallespir':'vallespir'
+};
+
+function resolveAlias(n) {
+  var k = norm(n);
+  if (CIS_GEO[k]) return k;
+  if (CIS_ALIAS[k]) return CIS_ALIAS[k];
+  // Fuzzy: check if any CIS_GEO key is contained in the name or vice versa
+  for (var gk in CIS_GEO) {
+    if (k.indexOf(gk) !== -1 || gk.indexOf(k) !== -1) return gk;
+  }
+  return k; // fallback
+}
 
 function computeIspCounts() {
   cisIspCount = {};
+  // Init all known CIS to 0
+  for (var gk in CIS_GEO) cisIspCount[gk] = 0;
+  // Also init from spreadsheet CIS list
   for (var i = 0; i < DATA.cis.length; i++) {
-    cisIspCount[norm(DATA.cis[i].nom)] = 0;
+    var key = resolveAlias(DATA.cis[i].nom);
+    if (!(key in cisIspCount)) cisIspCount[key] = 0;
   }
+  // Count ISP
   for (var i = 0; i < DATA.isp.length; i++) {
     var isp = DATA.isp[i];
-    var cp = norm(isp.centrePrincipal);
-    var cs = norm(isp.centreSecondaire);
+    var cp = isp.centrePrincipal ? resolveAlias(isp.centrePrincipal) : '';
+    var cs = isp.centreSecondaire ? resolveAlias(isp.centreSecondaire) : '';
     if (cp && cs) {
       cisIspCount[cp] = (cisIspCount[cp] || 0) + 0.5;
       cisIspCount[cs] = (cisIspCount[cs] || 0) + 0.5;
@@ -251,6 +305,8 @@ function computeIspCounts() {
       cisIspCount[cp] = (cisIspCount[cp] || 0) + 1;
     }
   }
+  // Log unmatched for debug
+  console.log('ISP counts:', JSON.stringify(cisIspCount));
 }
 
 /* Compute initial targets: actual ISP + fair share of recruitment needed */
