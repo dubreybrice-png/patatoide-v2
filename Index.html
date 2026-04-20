@@ -379,12 +379,13 @@ function drawMap() {
     if (coords.length === 0) return;
 
     var covPct = getCovPct(sec.type);
+    var hPerIsp = parseInt(document.getElementById('sliderHeures').value) || 36;
     var totalTarget = 0, totalActual = 0;
     sec.cis.forEach(function(cn) {
       totalTarget += (cisTargets[norm(cn)] || 0);
       totalActual += (cisIspCount[norm(cn)] || 0);
     });
-    var needed = calcNeededIsp(covPct, sec.hPerIsp);
+    var needed = calcNeededIsp(covPct, hPerIsp);
     var recruit = Math.max(0, Math.ceil(needed) - Math.ceil(totalActual));
     var currentCov = needed > 0 ? Math.min(100, Math.round(totalActual / needed * 100)) : 100;
 
