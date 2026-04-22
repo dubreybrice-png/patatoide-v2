@@ -496,7 +496,7 @@ function updateAll() {
       '<div class="sector-stats">' +
       '<div class="st '+statusCls+'"><b>'+sectorIsp.toFixed(1)+'</b>actuels</div>' +
       '<div class="st"><b>'+Math.ceil(needed)+'</b>nécessaires</div>' +
-      '<div class="st '+(recruit>0?'crit':'ok')+'"><b>'+(recruit>0?'+'+recruit:'✓')+'</b>recrutement</div>' +
+        '<div class="st '+(recruit>0?'crit':'ok')+'"><b>'+(recruit>0?'+'+recruit:'✓')+'</b>recrutements</div>' +
       '</div>' +
       '<div class="sector-slider-row" onclick="event.stopPropagation()"><span>⏱ h/ISP:</span>' +
       '<input type="range" min="12" max="72" value="'+hPerIsp+'" step="1" oninput="changeSectorH('+idx+',this.value)">' +
@@ -505,13 +505,19 @@ function updateAll() {
 
   document.getElementById('sectorsContainer').innerHTML = sectorHtml;
 
+  // IMPORTANT: total recrutements must be computed globally,
+  // not by summing sector rounded deficits (which can overcount).
+  var totalActuelsDisplay = Math.round(totalActuels);
+  var totalNeededDisplay = Math.ceil(totalNeeded);
+  var totalRecruitGlobal = Math.max(0, totalNeededDisplay - totalActuelsDisplay);
+
   ['','2'].forEach(function(s) {
     var el = document.getElementById('sumActuels'+s);
-    if(el) el.textContent = Math.round(totalActuels);
+    if(el) el.textContent = totalActuelsDisplay;
     el = document.getElementById('sumNecessaires'+s);
-    if(el) el.textContent = Math.ceil(totalNeeded);
+    if(el) el.textContent = totalNeededDisplay;
     el = document.getElementById('sumRecrut'+s);
-    if(el) el.textContent = totalRecruit > 0 ? '+'+totalRecruit : '0';
+    if(el) el.textContent = totalRecruitGlobal > 0 ? '+'+totalRecruitGlobal : '0';
   });
 
   // Remove global rebalance — now per-sector in CIS tab
