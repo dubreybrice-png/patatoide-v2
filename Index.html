@@ -190,16 +190,16 @@ var CIS_GEO = {
 var SECTORS = [
   { name:'Agglo', cis:['perpignan ouest','perpignan nord','perpignan sud'], type:1, color:'#e63946', hPerIsp:36 },
   { name:'Albères', cis:['saint cyprien','elne','palau','argeles'], type:2, color:'#e67e22', hPerIsp:36 },
-  { name:'Albères Côtier', cis:['cote vermeille','banyuls','cerbere'], type:3, color:'#e84393', hPerIsp:36 },
+  { name:'Côte Vermeille', cis:['cote vermeille','banyuls','cerbere'], type:3, color:'#e84393', hPerIsp:36 },
   { name:'Nord Côtier', cis:['le barcares','salanque','canet'], type:2, color:'#e67e22', hPerIsp:36 },
   { name:'Nord', cis:['agly','vingrau','baixas','rivesaltes','salses'], type:2, color:'#e67e22', hPerIsp:36 },
   { name:'Centre', cis:['ille sur tet','millas','riberal','les aspres'], type:2, color:'#e67e22', hPerIsp:36 },
-  { name:'Vallespir 1', cis:['ceret','boulou'], type:2, color:'#e67e22', hPerIsp:36 },
-  { name:'Vallespir 2', cis:['prats de mollo','vallespir','saint laurent de cerdans'], type:3, color:'#e84393', hPerIsp:36 },
+  { name:'Bas Vallespir', cis:['ceret','boulou'], type:2, color:'#e67e22', hPerIsp:36 },
+  { name:'Haut Vallespir', cis:['prats de mollo','vallespir','saint laurent de cerdans'], type:3, color:'#e84393', hPerIsp:36 },
   { name:'Fenouillèdes', cis:['caudies','saint paul de fenouillet','maury','sournia'], type:3, color:'#e84393', hPerIsp:36 },
   { name:'Conflent', cis:['olette','vernet','prades','vinca'], type:2, color:'#e67e22', hPerIsp:36 },
   { name:'Montagne 1', cis:['capcir','font romeu','mont louis'], type:3, color:'#e84393', hPerIsp:36 },
-  { name:'Montagne 2', cis:['porte puymorens','saillagouse','cerdagne'], type:3, color:'#e84393', hPerIsp:36 }
+  { name:'Cerdagne', cis:['porte puymorens','saillagouse','cerdagne'], type:3, color:'#e84393', hPerIsp:36 }
 ];
 
 /* ═══ DONNÉES ═══ */
@@ -471,7 +471,7 @@ function updateAll() {
   document.getElementById('valZ2').textContent = document.getElementById('sliderZ2').value + '%';
   document.getElementById('valZ3').textContent = document.getElementById('sliderZ3').value + '%';
 
-  var totalActuels = 0, totalNeeded = 0, totalRecruit = 0;
+  var totalActuels = 0, totalNeeded = 0;
   var sectorHtml = '';
 
   SECTORS.forEach(function(sec, idx) {
@@ -484,8 +484,6 @@ function updateAll() {
 
     totalActuels += sectorIsp;
     totalNeeded += needed;
-    totalRecruit += recruit;
-
     var statusCls = currentCov >= 100 ? 'ok' : (currentCov >= 70 ? 'warn' : 'crit');
     sectorHtml += '<div class="sector-card" data-s="'+sec.name+'" style="border-left-color:'+sec.color+';" onclick="hlSector(\''+sec.name+'\')">' +
       '<div class="sector-name"><span style="color:'+sec.color+';">■</span> '+sec.name+
